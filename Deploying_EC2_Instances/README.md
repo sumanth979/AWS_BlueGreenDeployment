@@ -1,6 +1,6 @@
 # Deploying Application Using EC2 Instances in Blue Green Deployment
 
-###[Introduction](https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/README.md)
+### [Introduction](https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/README.md)
 
 ### Deployment Details:
 The Deployment template will contain the creation of the following AWS Resources:

@@ -28,6 +28,7 @@ The Deployment template will contain the creation of the following AWS Resources
   * Creating AutoScaling Group for Green Mode
     * Creating Appropriate Lauch configuration
 
+- - - -
 ### Deployment Architecture Diagram:
 <img src="https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/Deploying_EC2_Instances/Architecture.png" alt="Deployment">
 

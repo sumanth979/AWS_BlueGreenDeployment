@@ -1,0 +1,62 @@
+[
+    {
+        "ParameterKey": "ASGGreenSize",
+        "ParameterValue": "1"
+    },
+    {
+        "ParameterKey": "ASGBlueSize",
+        "ParameterValue": "1"
+    },
+    {
+        "ParameterKey": "ASGSizeMinSize",
+        "ParameterValue": "1"
+    },
+    {
+        "ParameterKey": "ASGSizeMaxSize",
+        "ParameterValue": "4"
+    },
+    {
+        "ParameterKey": "MyVPCId",
+        "ParameterValue": "<>"
+    },
+    {
+        "ParameterKey": "Subnets",
+        "ParameterValue": "<>"
+    },
+    {
+        "ParameterKey": "Subnets",
+        "ParameterValue": "<>"
+    },
+    {
+        "ParameterKey": "InstanceType",
+        "ParameterValue": "t2.micro"
+    },
+    {
+        "ParameterKey": "ImageId",
+        "ParameterValue": "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+    },
+    {
+        "ParameterKey": "KeyName",
+        "ParameterValue": "my_ec2_key"
+    },
+    {
+        "ParameterKey": "ImageId",
+        "ParameterValue": "/aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2"
+    },
+    {
+        "ParameterKey": "InternalELBName",
+        "ParameterValue": "myapp-internal-elb"
+    },
+    {
+        "ParameterKey": "AppListenerColor",
+        "ParameterValue": "blue"
+    },
+    {
+        "ParameterKey": "TargetGroupBlueName",
+        "ParameterValue": "web-app-blue"
+    },
+    {
+        "ParameterKey": "TargetGroupGreenName",
+        "ParameterValue": "web-app-green"
+    }
+]

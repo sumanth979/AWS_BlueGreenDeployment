@@ -42,7 +42,7 @@ The Deployment template will contain the creation of the following AWS Resources
 * The Load Balancer DNS details.
 <img src="https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/Deploying_EC2_Instances/output.png" alt="output">
 
-### Deploy using AWS Console
+## Deploy using AWS Console
 * To Create the stack details
 ```
 aws cloudformation create-stack --stack-name stackName --template-body file://cf_deployment_template.yaml --role-arn roleARN --parameters file://parameters.json

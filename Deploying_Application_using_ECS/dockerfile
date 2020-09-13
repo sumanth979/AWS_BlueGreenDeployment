@@ -1,0 +1,6 @@
+FROM centos:7
+RUN yum update 
+RUN yum install httpd httpd-tools -y 
+EXPOSE 80
+COPY index.html /var/www/html/index.html
+CMD ["/usr/sbin/httpd","-D","FOREGROUND"]

@@ -9,4 +9,5 @@ This Repository explains the deployment of the Application in blue-green deploym
   * [Deoplyment Template](https://github.com/sumanth979/AWS_BlueGreenDeployment/tree/master/Deploying_EC2_Instances)
   
 #### Deploying Application using ECS Instances
-  * Working on it.
+  * [Deployment Documentation](https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/Deploying_Application_using_ECS/README.md)
+  * [Deoplyment Template](https://github.com/sumanth979/AWS_BlueGreenDeployment/tree/master/Deploying_Application_using_ECS)

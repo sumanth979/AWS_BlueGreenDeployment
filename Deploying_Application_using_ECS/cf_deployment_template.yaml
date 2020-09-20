@@ -1,0 +1,430 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Resources:
+  ELBSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http to client host
+        GroupName: AppELBSecurityGroup
+        VpcId: 
+          Ref: MyVPCId
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+  InstanceSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow http to client host
+        GroupName: AppInstanceSecurityGroup
+        VpcId: 
+          Ref: MyVPCId
+        SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 80
+          ToPort: 80
+          SourceSecurityGroupId: !GetAtt ELBSecurityGroup.GroupId
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 0
+          ToPort: 65535
+          CidrIp: 0.0.0.0/0
+    DependsOn:
+    - ELBSecurityGroup
+  ECSInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2008-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  ECSInstanceProfile:
+    Type: 'AWS::IAM::InstanceProfile'
+    Properties:
+      Path: /
+      Roles:
+        - Ref: ECSInstanceRole
+    DependsOn:
+    - ECSInstanceRole
+  ECSServiceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2008-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: 
+                - ecs.amazonaws.com
+                - application-autoscaling.amazonaws.com
+            Action: 'sts:AssumeRole'
+      ManagedPolicyArns:
+        - 'arn:aws:iam::aws:policy/AdministratorAccess'
+  AppAutoScalingGroup:
+    Type: AWS::AutoScaling::AutoScalingGroup
+    Properties:
+      DesiredCapacity:
+        Ref: ASGSize
+      HealthCheckType: ELB
+      HealthCheckGracePeriod: '180'
+      LaunchConfigurationName:
+        Ref: AppLaunchConfiguration
+      MaxSize:
+        Ref: ASGSizeMaxSize
+      MinSize:
+        Ref: ASGSizeMinSize
+      TerminationPolicies:
+      - Default
+      VPCZoneIdentifier:
+        Ref: Subnets
+      Tags:
+      - PropagateAtLaunch: true
+        Value: AppServer
+        Key: Purpose
+    DependsOn:
+    - AppLaunchConfiguration
+  AppLaunchConfiguration:
+    Type: AWS::AutoScaling::LaunchConfiguration
+    Properties:
+      BlockDeviceMappings:
+      - DeviceName: "/dev/xvda"
+        Ebs:
+          DeleteOnTermination: true
+          VolumeSize: 8
+          VolumeType: gp2
+      EbsOptimized: false
+      IamInstanceProfile:
+        Ref: ECSInstanceProfile
+      ImageId:
+        Ref: ImageId
+      InstanceMonitoring: true
+      InstanceType:
+        Ref: InstanceType
+      KeyName:
+        Ref: KeyName
+      SecurityGroups: [
+        Ref: InstanceSecurityGroup ]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          echo ECS_CLUSTER=web-app >> /etc/ecs/ecs.config
+          amazon-linux-extras disable docker
+          amazon-linux-extras install -y ecs
+          systemctl enable --now ecs
+    DependsOn:
+    - InstanceSecurityGroup
+    - ECSInstanceProfile
+  AppELB:
+    Type: AWS::ElasticLoadBalancingV2::LoadBalancer
+    Properties:
+      IpAddressType: ipv4
+      Name:
+        Ref: InternalELBName
+      Scheme: internet-facing
+      SecurityGroups: [
+        Ref: ELBSecurityGroup ]
+      Subnets:
+        Ref: Subnets
+      Type: application
+  ECSCluster:
+    Type: AWS::ECS::Cluster
+    Properties:
+      ClusterName:
+        Ref: ECSClusterName
+  AppELBTargetGroupBlue:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: 
+        Fn::If: [AppListenerColorBlue, "/" ,"/"]
+      HealthCheckPort: '80'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200'
+      Name:
+        Ref: TargetGroupBlueName
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      UnhealthyThresholdCount: 2
+      VpcId:
+        Ref: MyVPCId
+    DependsOn:
+    - AppELB
+  AppELBTargetGroupGreen:
+    Type: AWS::ElasticLoadBalancingV2::TargetGroup
+    Properties:
+      HealthCheckIntervalSeconds: 10
+      HealthCheckPath: 
+        Fn::If: [AppListenerColorBlue, "/" ,"/"] 
+      HealthCheckPort: '80'
+      HealthCheckProtocol: HTTP
+      HealthCheckTimeoutSeconds: 5
+      HealthyThresholdCount: 5
+      Matcher:
+        HttpCode: '200'
+      Name:
+        Ref: TargetGroupGreenName
+      Port: 80
+      Protocol: HTTP
+      TargetGroupAttributes:
+      - Key: deregistration_delay.timeout_seconds
+        Value: '20'
+      UnhealthyThresholdCount: 2
+      VpcId:
+        Ref: MyVPCId
+    DependsOn:
+    - AppELB
+  AppELBDefaultListener:
+    Type: AWS::ElasticLoadBalancingV2::Listener
+    Properties:
+      LoadBalancerArn:
+        Ref: AppELB
+      DefaultActions:
+      - Type: forward
+        TargetGroupArn:
+          Fn::If:
+          - AppListenerColorBlue
+          - Ref: AppELBTargetGroupBlue
+          - Ref: AppELBTargetGroupGreen
+      Port: 80
+      Protocol: HTTP
+    DependsOn:
+    - AppELB
+    - AppELBTargetGroupBlue
+    - AppELBTargetGroupGreen
+  ELBListenerRuleBlue:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: AppELBTargetGroupBlue
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/app-blue"
+      ListenerArn:
+        Ref: AppELBDefaultListener
+      Priority: 1
+    DependsOn:
+    - AppELBDefaultListener
+    - AppELBTargetGroupBlue
+  ELBListenerRuleGreen:
+    Type: AWS::ElasticLoadBalancingV2::ListenerRule
+    Properties:
+      Actions:
+      - Type: forward
+        TargetGroupArn:
+          Ref: AppELBTargetGroupGreen
+      Conditions:
+      - Field: path-pattern
+        Values:
+        - "/app-green"
+      ListenerArn:
+        Ref: AppELBDefaultListener
+      Priority: 2
+    DependsOn:
+    - AppELBDefaultListener
+    - AppELBTargetGroupGreen
+  AppECSTaskDefinitionGreen:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: webapp-container-green
+        MountPoints:
+        - SourceVolume: webapp
+          ContainerPath: "/var/www/html"
+        Image:
+          Fn::Join:
+          - ":"
+          - - Ref: webAppRepository
+            - Ref: GreenTag
+        PortMappings:
+        - ContainerPort: 80
+          HostPort: 80
+          Protocol: tcp
+        Memory: '700'
+        Essential: 'true'
+      Family: webapp-task-definition-green
+      NetworkMode: host
+      Volumes:
+      - Host:
+          SourcePath: "/web"
+        name: webapp
+  AppECSTaskDefinitionBlue:
+    Type: AWS::ECS::TaskDefinition
+    Properties:
+      ContainerDefinitions:
+      - Name: webapp-container-blue
+        MountPoints:
+        - SourceVolume: webapp
+          ContainerPath: "/var/www/html"
+        Image:
+          Fn::Join:
+          - ":"
+          - - Ref: webAppRepository
+            - Ref: BlueTag
+        PortMappings:
+        - ContainerPort: 80
+          HostPort: 80
+          Protocol: tcp
+        Memory: '7000'
+        Essential: 'true'
+      Family: webapp-task-definition-green
+      NetworkMode: host
+      Volumes:
+      - Host:
+          SourcePath: "/web"
+        name: webapp
+  AppECSServicegreen:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: ECSClusterName
+      DesiredCount:
+        Ref: AppGreenSize
+      LoadBalancers:
+      - ContainerName: webapp-container-green
+        ContainerPort: 80
+        TargetGroupArn:
+          Ref: AppELBTargetGroupGreen
+      Role:
+        Ref: ECSServiceRole
+      TaskDefinition:
+        Ref: AppECSTaskDefinitionGreen
+    DependsOn:
+    - AppECSTaskDefinitionGreen
+    - ELBListenerRuleGreen
+    - ECSServiceRole
+  AppECSServiceblue:
+    Type: AWS::ECS::Service
+    Properties:
+      Cluster:
+        Ref: ECSClusterName
+      DesiredCount:
+        Ref: AppBlueSize
+      LoadBalancers:
+      - ContainerName: webapp-container-blue
+        ContainerPort: 80
+        TargetGroupArn:
+          Ref: AppELBTargetGroupBlue
+      Role:
+        Ref: ECSServiceRole
+      TaskDefinition:
+        Ref: AppECSTaskDefinitionBlue
+    DependsOn:
+    - AppECSTaskDefinitionBlue
+    - ELBListenerRuleBlue
+    - ECSServiceRole
+  
+Parameters:
+  ASGSize:
+    Description: Desired number of EC2 instances in Auto Scaling Group
+    Type: Number
+    Default: 1
+  ASGSizeMinSize:
+    Description: Min number of EC2 instances in Auto Scaling Group
+    Type: Number
+    Default: 1
+  ASGSizeMaxSize:
+    Description: Max number of EC2 instances in Auto Scaling Group
+    Type: Number
+    Default: 4
+  ECSClusterName:
+    Description: ECS Cluster name to place webapp
+    Type: String
+    Default: web-app
+  MyVPCId:
+    Description: VPC Id
+    Type: AWS::EC2::VPC::Id
+  Subnets:
+    Description: List of subnets
+    Type: List<AWS::EC2::Subnet::Id>
+  InstanceType:
+    Description: EC2 instance type
+    Type: String
+    Default: t2.micro
+    AllowedValues:
+    - t1.micro
+    - t2.micro
+  ImageId:
+    Description: Region specific image from the Parameter Store
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/amzn2-ami-hvm-x86_64-gp2
+  KeyName:
+    Description: EC2 key pair
+    Type: String
+    Default: my_ec2_key
+  InternalELBName:
+    Description: Internal ELB Name Assigned
+    Type: String
+    Default: myapp-internal-elb
+  AppListenerColor:
+    Description: default Listener color
+    Type: String
+    Default: blue
+    AllowedValues:
+    - blue
+    - green
+  TargetGroupBlueName:
+    Description: Blue Target Group Name Assigned
+    Type: String
+    Default: web-app-blue
+  TargetGroupGreenName:
+    Description: Green Target Group Name Assigned
+    Type: String
+    Default: web-app-green
+  AppGreenSize:
+    Description: Number of App instances to run for green nodes
+    Type: Number
+    Default: 1
+  AppBlueSize:
+    Description: Number of App instances to run for blue nodes
+    Type: Number
+    Default: 1
+  webAppRepository:
+    Description: Docker Registry for webapp container
+    Type: String
+    Default: sumanth979/mywebapp
+  GreenTag:
+    Description: webapp container label for green node
+    Type: String
+    Default: green
+  BlueTag:
+    Description: webapp container label for blue node
+    Type: String
+    Default: blue
+
+Outputs:
+  ELBFQDN:
+    Description: Elastic Load Balancer address
+    Value:
+      Fn::GetAtt:
+      - AppELB
+      - DNSName
+
+Conditions:
+  AppListenerColorBlue:
+    Fn::Equals:
+    - Ref: AppListenerColor
+    - blue

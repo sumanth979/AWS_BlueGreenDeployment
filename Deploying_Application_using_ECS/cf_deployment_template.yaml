@@ -119,13 +119,16 @@ Resources:
       SecurityGroups: [
         Ref: InstanceSecurityGroup ]
       UserData:
-        Fn::Base64: !Sub |
-          #!/bin/bash
-          yum update -y
-          echo ECS_CLUSTER=web-app >> /etc/ecs/ecs.config
-          amazon-linux-extras disable docker
-          amazon-linux-extras install -y ecs
-          systemctl enable --now ecs
+        Fn::Base64: !Sub
+          - |
+            #!/bin/bash
+            yum update -y
+            amazon-linux-extras disable docker
+            amazon-linux-extras install -y ecs
+            echo ECS_CLUSTER=${cluster_name} > /etc/ecs/ecs.config
+            systemctl enable --now ecs
+          - cluster_name:
+              Ref: ECSClusterName
     DependsOn:
     - InstanceSecurityGroup
     - ECSInstanceProfile
@@ -251,9 +254,6 @@ Resources:
     Properties:
       ContainerDefinitions:
       - Name: webapp-container-green
-        MountPoints:
-        - SourceVolume: webapp
-          ContainerPath: "/var/www/html"
         Image:
           Fn::Join:
           - ":"
@@ -267,18 +267,11 @@ Resources:
         Essential: 'true'
       Family: webapp-task-definition-green
       NetworkMode: host
-      Volumes:
-      - Host:
-          SourcePath: "/web"
-        name: webapp
   AppECSTaskDefinitionBlue:
     Type: AWS::ECS::TaskDefinition
     Properties:
       ContainerDefinitions:
       - Name: webapp-container-blue
-        MountPoints:
-        - SourceVolume: webapp
-          ContainerPath: "/var/www/html"
         Image:
           Fn::Join:
           - ":"
@@ -288,14 +281,10 @@ Resources:
         - ContainerPort: 80
           HostPort: 80
           Protocol: tcp
-        Memory: '7000'
+        Memory: '700'
         Essential: 'true'
       Family: webapp-task-definition-green
       NetworkMode: host
-      Volumes:
-      - Host:
-          SourcePath: "/web"
-        name: webapp
   AppECSServicegreen:
     Type: AWS::ECS::Service
     Properties:

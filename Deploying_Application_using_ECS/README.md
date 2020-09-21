@@ -55,7 +55,22 @@ The Deployment template will contain the creation of the following AWS Resources
 <img src="https://github.com/sumanth979/AWS_BlueGreenDeployment/blob/master/Deploying_Application_using_ECS/output.png" alt="output">
 
 - - - -
-## Deploy using AWS Console
+## Instructions to Deploy
+* Use the docker file and color.html files to create the docker images.
+```
+docker build -t mywebapp:blue .
+          (or)
+docker build -t mywebapp:green .
+```
+* To push the created docker images to docker repository
+```
+1. docker login
+2. docker tag mywebapp:blue <dockerusername>/mywebapp:blue
+3. docker push <dockerusername>/mywebapp:blue
+4. docker logout.
+```
+
+### Deploy using AWS Console
 * To Create the stack details
 ```
 aws cloudformation create-stack --stack-name stackName --template-body file://cf_deployment_template.yaml --role-arn roleARN --parameters file://parameters.json
